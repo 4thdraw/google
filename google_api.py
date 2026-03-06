@@ -6,14 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-
-
-# 한글 폰트  기본설정접근 수정 (예: 맑은 고딕)
 plt.rcParams['font.family'] = 'Malgun Gothic'
-# 한글폰트가 기본인 경우 - 부호가 깨지는 경우가 있음. 이를 방지하기 위해 아래 설정 추가
-# 유니코드에서 마이너스 기호가 깨지는 문제 해결
-# 네모모양으로 표시되는 경우는 폰트가 해당 문자를 지원하지 않아서 발생하는 문제입니다.
 plt.rcParams['axes.unicode_minus'] = False
+
 
 # 1. 인증 범위 설정
 scope = [
@@ -21,30 +16,16 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# 2. 서비스 계정 인증
+creds = Credentials.from_service_account_file(
+    "./key/logical-contact-489206-a2-594ef50d3ae3.json",
+    scopes=scope
+)
 
-#google.oauth2.service_account.Credentials
-# 🔑 주요 메서드
-# 메서드	설명
-# from_service_account_file()	JSON 파일로부터 인증 객체 생성
-# from_service_account_info()	dict 형태 JSON 정보로 생성
-# with_scopes()	접근 범위(scope) 추가
-# with_subject()	사용자 위임(도메인 위임) 설정
-# refresh(request)	액세스 토큰 갱신
-# before_request(request, method, url, headers)	API 요청 전에 토큰 자동 처리
 
 client = gspread.authorize(creds)
 
-# 1️⃣ creds 안에는
-# → 서비스계정 키 + 토큰 생성 정보 있음
 
-# 2️⃣ gspread.authorize(creds)가
-# 토큰 생성
-# API 요청 준비
-# 인증 헤더 생성
 
-# 3️⃣ 그 결과로
-# 👉 Client 객체 생성
 
 print(type(client))
 
@@ -60,26 +41,22 @@ print(f"""
 """)
 # 무사히 가져왔는지 확인
 
-# %%
+
 worksheet = spreadsheet.sheet1
 
 
-# 4. 데이터 가져오기
-# 셀 실행순간에만 데이터를 가져와서 저장
-# 구글시트에서 수정한 다음 이 부분을 다시 실행하면 최신 데이터로 업데이트됨
+
 data = worksheet.get_all_records()
 df = pd.DataFrame(data)
 print(df.shape)
-# %%
+
 print(df.head())
 
 # %%
-# 데이터로 정보 가치 확인하기
-# 이 컬럼들은 정보량이 0입니다.
-# Index = 데이터의 위치를 식별하는 "이름표" 컬럼저장 객체 , index는 고유한 행의 값
+
 df.nunique()
 
-# %%
+
 # 값이 동일한 컬럼확인하기
 meaningless_cols = df.columns[df.nunique() == 1]
 print(meaningless_cols)
@@ -87,6 +64,8 @@ print(meaningless_cols)
 
 df = df.drop(columns=meaningless_cols) # 의미 없는 컬럼 제거
 print(df.head())
+
+
 # %%
 # 5. 시각화 예시 (예: 남/여 인원수 막대그래프)
 
@@ -135,5 +114,256 @@ plt.xlabel("성별")
 plt.ylabel("인원(명)")
 plt.title("서울시 요양보호사 성별 인원수")
 
+plt.show()
+
+# %%
+#df_sum = df.groupby("교육기관명")["인원(명)"].sum()
+df_sum = df.groupby("교육기관명")["인원(명)"].sum().sort_values(ascending=False).head(20)
+# 교육기관명별 인원수 합계를 계산한 후, 내림차순으로 정렬하여 상위 20개만 추출
+print(df_sum)
+plt.figure(figsize=(10, 6)) # 그래프의 크기를 가로 10인치, 세로 6인치로 설정
+plt.bar(df_sum.index, df_sum.values, color="lightgreen")   
+plt.xlabel("교육기관명")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수")
+plt.xticks(rotation=45, ha="right")  # x축 레이블을 45도 회전하여 겹치지 않도록 설정
+plt.tight_layout()  # 그래프 요소들이 겹치지 않도록 레이아웃 조정
+plt.show() 
+
+# %%
+import string
+df_sum = df.groupby("교육기관명")["인원(명)"].sum().sort_values(ascending=False).head(20)
+# A,B,C... 코드 생성
+codes = list(string.ascii_uppercase[:len(df_sum)])
+print(codes)
+# 기관명 → 코드 매핑
+mapping = dict(zip(codes, df_sum.index))
+# zip()은 여러 iterable(리스트, 튜플 등)을 같은 위치끼리 묶어서 하나의 쌍(pair)으로 만들어 주는 함수입니다.
+
+
+print(mapping)
+
+
+plt.figure(figsize=(10,6))
+plt.bar(codes, df_sum.values, color="lightgreen")
+
+plt.xlabel("교육기관 코드")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수 (Top 20)")
+
+plt.tight_layout()
+plt.show()
+
+# 코드표 출력
+for k,v in mapping.items():
+    print(f"{k} : {v}")
+
+# %%
+plt.figure(figsize=(10,6))
+
+plt.bar(codes, df_sum.values, color="lightgreen")
+
+plt.xlabel("교육기관 코드")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수")
+
+# legend 텍스트 만들기
+legend_text = [f"{k} : {v}" for k,v in mapping.items()]
+# ython의 리스트 컴프리헨션(list comprehension) 이라는 문법
+# 다른 언어에서는 보통 여러 줄로 작성하는 것을 한 줄로 간결하게 표현
+
+# legend_text = []
+
+# for k, v in mapping.items():
+#     legend_text.append(f"{k} : {v}")
+# ['A : 종로...', 'B : 강남...', 'C : 송파...']
+
+print(legend_text)
+
+
+plt.legend(legend_text, title="교육기관 코드", bbox_to_anchor=(1.05,1), loc="upper left")
+
+plt.tight_layout()
+plt.show()
+
+# legend() 함수는 그래프에 범례(legend)를 추가하는 함수입니다.
+# legend_text는 범례에 표시할 텍스트 리스트입니다.
+
+# %%
+plt.figure(figsize=(10,6))
+
+plt.bar(codes, df_sum.values, color="lightgreen")
+
+plt.xlabel("교육기관 코드")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수")
+
+# legend 텍스트 만들기
+legend_text = [f"{k} : {v}" for k,v in mapping.items()]
+
+from matplotlib.patches import Patch
+#Patch는 matplotlib에서 채워진 도형(shape) 을 의미
+handles = [
+    Patch(color="lightgreen", label=f"{k} : {v}")
+    for k,v in mapping.items()
+]
+#그래프에 범례(legend)를 표시하면서 위치와 제목을 설정하는 코드
+#Patch(label="A : 종로교육원")
+plt.legend(handles=handles,
+           title="교육기관 코드",
+           bbox_to_anchor=(1.05,1), # (0,0)   = 왼쪽 아래  (1,1)   = 오른쪽 위
+           loc="upper left")
+
+# | loc 값            | 의미               | legend 기준점 위치  |
+# | ---------------- | ---------------- | -------------- |
+# | `"best"`         | 자동으로 가장 좋은 위치 선택 | 데이터 안 가리는 위치   |
+# | `"upper right"`  | 오른쪽 위            | legend의 오른쪽 위  |
+# | `"upper left"`   | 왼쪽 위             | legend의 왼쪽 위   |
+# | `"lower left"`   | 왼쪽 아래            | legend의 왼쪽 아래  |
+# | `"lower right"`  | 오른쪽 아래           | legend의 오른쪽 아래 |
+# | `"right"`        | 오른쪽 중앙           | legend의 오른쪽 중앙 |
+# | `"center left"`  | 왼쪽 중앙            | legend의 왼쪽 중앙  |
+# | `"center right"` | 오른쪽 중앙           | legend의 오른쪽 중앙 |
+# | `"lower center"` | 아래 중앙            | legend의 아래 중앙  |
+# | `"upper center"` | 위 중앙             | legend의 위 중앙   |
+# | `"center"`       | 중앙               | legend의 중심     |
+
+plt.tight_layout() # 여백(margin)을 자동 계산하여 그래프 요소들이 겹치지 않도록 조정하는 함수
+plt.show()
+
+# %%
+import numpy as np
+colors = plt.cm.tab20(np.linspace(0,1,len(df_sum)))
+plt.figure(figsize=(10,6))
+
+plt.bar(codes, df_sum.values, color=colors)
+
+plt.xlabel("교육기관 코드")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수")
+# 코드표 문자열
+text = "\n".join([f"{k} : {v}" for k,v in mapping.items()])
+
+plt.text(
+    1.02, 0.5,
+    text,
+    transform=plt.gca().transAxes,
+    fontsize=8,
+    verticalalignment='center'
+)
+
+plt.tight_layout()
+plt.show()
+
+# %%
+df_filtered = df[df["교육기관명"].str.contains("영업중", na=False)]
+
+
+df_sum = df_filtered.groupby("교육기관명")["인원(명)"].sum().sort_values(ascending=False).head(20)
+
+print(df_sum)
+
+codes = list(string.ascii_uppercase[:len(df_sum)])
+print(codes)
+# 기관명 → 코드 매핑
+mapping = dict(zip(codes, df_sum.index))
+print(mapping)
+
+# %%
+
+
+# | 코드                    | 의미                 |
+# | --------------------- | ------------------ |
+# | `str.contains("영업중")` | 문자열 안에 "영업중" 포함 여부 |
+# | `na=False`            | NaN 값 에러 방지        |
+# | `df[...]`             | 조건에 맞는 행만 선택       |
+
+plt.figure(figsize=(10,6))
+
+plt.bar(codes, df_sum.values, color=colors)
+
+plt.xlabel("교육기관 코드")
+plt.ylabel("인원(명)")
+plt.title("서울시 요양보호사 교육기관별 인원수")
+# 코드표 문자열
+text = "\n".join([f"{k} : {v}" for k,v in mapping.items()])
+
+plt.text(
+    1.02, 0.5,
+    text,
+    transform=plt.gca().transAxes,
+    fontsize=8,
+    verticalalignment='center'
+)
+
+plt.tight_layout()
+plt.show()
+
+# %%
+df_sum = df.groupby("자치구명")["인원(명)"].sum()
+
+# 항상 인원수 기준 정렬
+df_sum = df_sum.sort_values(ascending=False)
+
+# 30개 초과하면 상위 30개만
+if len(df_sum) > 30:
+    df_sum = df_sum.head(30)
+    print(f"자치구가 {len(df_sum)}개 이상이라 상위 30개만 표시")
+
+plt.figure(figsize=(10,6))
+plt.bar(df_sum.index, df_sum.values, color="skyblue")
+
+plt.xlabel("자치구")
+plt.ylabel("인원(명)")
+plt.title("서울시 자치구별 요양보호사 인원")
+
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# %%
+# Pandas DataFrame과 직접 연동하여 시각화 Seaborn 라이브러리 활용
+# “컬럼이 많은 데이터”에 특히 강함
+
+print(df.head())
+
+import seaborn as sns
+df_sum = (
+    df.groupby("자치구명")["인원(명)"]
+    .sum()
+    .sort_values(ascending=False)
+    .reset_index()
+)
+
+plt.figure(figsize=(10,6))
+
+sns.barplot(data=df_sum, x="자치구명", y="인원(명)")
+
+plt.xticks(rotation=45)
+plt.title("서울시 자치구별 요양보호사 인원")
+
+plt.show()
+# %%
+# 자치구 + 성별 기준 인원 합계
+df_gender = (
+    df.groupby(["자치구명", "성별"])["인원(명)"]
+    .sum()
+    .reset_index()
+)
+
+plt.figure(figsize=(12,6))
+
+sns.barplot(
+    data=df_gender,
+    x="자치구명",
+    y="인원(명)",
+    hue="성별"
+)
+# hue = 색상 기준 그룹
+
+plt.xticks(rotation=45)
+plt.title("자치구별 요양보호사 성별 인원 비교")
+
+plt.tight_layout()
 plt.show()
 # %%
